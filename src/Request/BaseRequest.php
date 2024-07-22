@@ -2,6 +2,8 @@
 
 namespace LaravelFCM\Request;
 
+use LaravelFCM\Request\FCMAuth;
+
 /**
  * Class BaseRequest.
  */
@@ -20,6 +22,7 @@ abstract class BaseRequest
      * @var array
      */
     protected $config;
+    protected $fcm_auth;
 
     /**
      * BaseRequest constructor.
@@ -27,6 +30,7 @@ abstract class BaseRequest
     public function __construct()
     {
         $this->config = app('config')->get('fcm.http', []);
+        $this->fcm_auth = new FCMAuth();
     }
 
     /**
@@ -37,7 +41,7 @@ abstract class BaseRequest
     protected function buildRequestHeader()
     {
         return [
-            'Authorization' => 'key='.$this->config['server_key'],
+            'Authorization' => 'Bearer ' . $this->fcm_auth->getAccessToken(),
             'Content-Type' => 'application/json',
             'project_id' => $this->config['sender_id'],
         ];

@@ -2,10 +2,10 @@
 
 namespace LaravelFCM\Request;
 
-use LaravelFCM\Message\Topics;
 use LaravelFCM\Message\Options;
 use LaravelFCM\Message\PayloadData;
 use LaravelFCM\Message\PayloadNotification;
+use LaravelFCM\Message\Topics;
 
 /**
  * Class Request.
@@ -75,7 +75,7 @@ class Request extends BaseRequest
     protected function buildBody()
     {
         $message = [
-            'to' => $this->getTo(),
+            'token' => $this->getTo(),
             'registration_ids' => $this->getRegistrationIds(),
             'notification' => $this->getNotification(),
             'data' => $this->getData(),
@@ -83,8 +83,7 @@ class Request extends BaseRequest
 
         $message = array_merge($message, $this->getOptions());
 
-        // remove null entries
-        return array_filter($message);
+        return ['message' => array_filter($message)];
     }
 
     /**
@@ -94,11 +93,7 @@ class Request extends BaseRequest
      */
     protected function getTo()
     {
-        $to = is_array($this->to) ? null : $this->to;
-
-        if ($this->topic && $this->topic->hasOnlyOneTopic()) {
-            $to = $this->topic->build();
-        }
+        $to = is_array($this->to) ? reset($this->to) : $this->to;
 
         return $to;
     }
@@ -136,7 +131,7 @@ class Request extends BaseRequest
      */
     protected function getNotification()
     {
-        return $this->notification ? $this->notification->toArray() : null;
+        return $this->notification ? $this->notification->getNotificationBody() : null;
     }
 
     /**
@@ -146,6 +141,15 @@ class Request extends BaseRequest
      */
     protected function getData()
     {
-        return $this->data ? $this->data->toArray() : null;
+        if (!$this->data) {
+            return null;
+        }
+
+        $result = [];
+        foreach ($this->data->toArray() as $key => $value) {
+            $result[$key] = is_object($value) || is_array($value) ? json_encode($value) : $value;
+        }
+
+        return $result;
     }
 }

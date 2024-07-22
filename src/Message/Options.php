@@ -26,6 +26,20 @@ class Options implements Arrayable
     /**
      * @internal
      *
+     * @var null|string
+     */
+    protected $android_priority;
+
+    /**
+     * @internal
+     *
+     * @var null|string
+     */
+    protected $ios_priority;
+
+    /**
+     * @internal
+     *
      * @var bool
      */
     protected $contentAvailable;
@@ -66,6 +80,33 @@ class Options implements Arrayable
     protected $isDryRun = false;
 
     /**
+     * @internal
+     *
+     * @var string
+     */
+    protected $iosImage = null;
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
+    protected $iosAnalyticsLabel = null;
+
+    /**
+     * @internal
+     *
+     * @var array
+     */
+    protected $apns_options = [];
+    /**
+     * @internal
+     *
+     * @var array
+     */
+    protected $android_options = [];
+
+    /**
      * Options constructor.
      *
      * @param OptionsBuilder $builder
@@ -74,12 +115,18 @@ class Options implements Arrayable
     {
         $this->collapseKey = $builder->getCollapseKey();
         $this->priority = $builder->getPriority();
+        $this->android_priority = $builder->getAndroidPriority();
+        $this->ios_priority = $builder->getIosPriority();
         $this->contentAvailable = $builder->isContentAvailable();
         $this->isMutableContent = $builder->isMutableContent();
         $this->delayWhileIdle = $builder->isDelayWhileIdle();
         $this->timeToLive = $builder->getTimeToLive();
         $this->restrictedPackageName = $builder->getRestrictedPackageName();
         $this->isDryRun = $builder->isDryRun();
+
+
+        $this->android_options = $builder->getAndroidOptions();
+        $this->apns_options = $builder->getAPNSOptions();
     }
 
     /**
@@ -89,22 +136,6 @@ class Options implements Arrayable
      */
     public function toArray()
     {
-        $contentAvailable = $this->contentAvailable ? true : null;
-        $mutableContent = $this->isMutableContent ? true : null;
-        $delayWhileIdle = $this->delayWhileIdle ? true : null;
-        $dryRun = $this->isDryRun ? true : null;
-
-        $options = [
-            'collapse_key' => $this->collapseKey,
-            'priority' => $this->priority,
-            'content_available' => $contentAvailable,
-            'mutable_content' => $mutableContent,
-            'delay_while_idle' => $delayWhileIdle,
-            'time_to_live' => $this->timeToLive,
-            'restricted_package_name' => $this->restrictedPackageName,
-            'dry_run' => $dryRun,
-        ];
-
-        return array_filter($options);
+        return array_merge(['android' => $this->android_options, 'apns' => $this->apns_options]);
     }
 }

@@ -17,7 +17,7 @@ use LaravelFCM\Message\PayloadNotification;
  */
 class FCMSender extends HTTPSender
 {
-    const MAX_TOKEN_PER_REQUEST = 1000;
+    public const MAX_TOKEN_PER_REQUEST = 1;
 
     /**
      * send a downstream message to.
@@ -58,25 +58,6 @@ class FCMSender extends HTTPSender
         }
 
         return $response;
-    }
-
-    /**
-     * Send a message to a group of devices identified with them notification key.
-     *
-     * @param                          $notificationKey
-     * @param Options|null             $options
-     * @param PayloadNotification|null $notification
-     * @param PayloadData|null         $data
-     *
-     * @return GroupResponse
-     */
-    public function sendToGroup($notificationKey, Options $options = null, PayloadNotification $notification = null, PayloadData $data = null)
-    {
-        $request = new Request($notificationKey, $options, $notification, $data);
-
-        $responseGuzzle = $this->post($request);
-
-        return new GroupResponse($responseGuzzle, $notificationKey);
     }
 
     /**

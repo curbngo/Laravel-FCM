@@ -146,10 +146,21 @@ class PayloadNotification implements Arrayable
         ];
 
         // remove null values
-        $notification = array_filter($notification, function($value) {
+        $notification = array_filter($notification, function ($value) {
             return $value !== null;
         });
-        
+
         return $notification;
+    }
+
+    public function getNotificationBody()
+    {
+        $notification = [
+            'title' => $this->title,
+            'body' => $this->body,
+            'image' => $this->icon,
+        ];
+
+        return array_filter($notification);
     }
 }

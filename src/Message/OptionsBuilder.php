@@ -70,6 +70,34 @@ class OptionsBuilder
     protected $dryRun = false;
 
     /**
+     * @internal
+     *
+     * @var string
+     */
+    protected $iosImageUrl = null;
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
+    protected $iosAnalyticsLabel = null;
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
+    protected $iosSound = null;
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
+    protected $androidSound = null;
+
+    /**
      * This parameter identifies a group of messages
      * A maximum of 4 different collapse keys is allowed at any given time.
      *
@@ -203,6 +231,60 @@ class OptionsBuilder
     }
 
     /**
+     * This parameter, Contains the URL of an image that is going to be displayed in a notification. If present, it will override
+     *
+     * @param string $iosImageUrl
+     *
+     * @return \LaravelFCM\Message\OptionsBuilder
+     */
+    public function setIosImageUrl($iosImageUrl)
+    {
+        $this->iosImageUrl = $iosImageUrl;
+
+        return $this;
+    }
+
+    /**
+     * Label associated with the message's analytics data.
+     *
+     * @param string $iosImageUrl
+     *
+     * @return \LaravelFCM\Message\OptionsBuilder
+     */
+    public function setIosAnalyticsLabel($iosAnalyticsLabel)
+    {
+        $this->iosAnalyticsLabel = $iosAnalyticsLabel;
+
+        return $this;
+    }
+    /**
+     * Label associated with the message's analytics data.
+     *
+     * @param string $iosImageUrl
+     *
+     * @return \LaravelFCM\Message\OptionsBuilder
+     */
+    public function setIosSound($sound)
+    {
+        $this->iosSound = $sound;
+
+        return $this;
+    }
+    /**
+     * Label associated with the message's analytics data.
+     *
+     * @param string $iosImageUrl
+     *
+     * @return \LaravelFCM\Message\OptionsBuilder
+     */
+    public function setAndoroidSound($sound)
+    {
+        $this->androidSound = $sound;
+
+        return $this;
+    }
+
+    /**
      * Get the collapseKey.
      *
      * @return null|string
@@ -220,6 +302,26 @@ class OptionsBuilder
     public function getPriority()
     {
         return $this->priority;
+    }
+
+    /**
+     * Get the priority for IOS.
+     *
+     * @return null|string
+     */
+    public function getIosPriority()
+    {
+        return $this->priority == OptionsPriorities::normal ? 10 : 5;
+    }
+
+    /**
+     * Get the priority for Android.
+     *
+     * @return null|string
+     */
+    public function getAndroidPriority()
+    {
+        return strtoupper($this->priority);
     }
 
     /**
@@ -283,6 +385,90 @@ class OptionsBuilder
     }
 
     /**
+     * get ios image url.
+     *
+     * @return null|string
+     */
+    public function getIosImageUrl()
+    {
+        return $this->iosImageUrl;
+    }
+
+    /**
+     * get label associated with the message's analytics data for ios
+     *
+     * @return null|string
+     */
+    public function getIosAnalyticsLabel()
+    {
+        return $this->iosAnalyticsLabel;
+    }
+
+    /**
+     * get ios sound
+     *
+     * @return null|string
+     */
+    public function getIosSound()
+    {
+        return $this->iosSound;
+    }
+
+    /**
+     * get android sound
+     *
+     * @return null|string
+     */
+    public function getAndroidSound()
+    {
+        return $this->androidSound;
+    }
+
+    public function getAndroidOptions()
+    {
+        $android_options = [
+            'collapse_key' => $this->getCollapseKey(),
+            'priority' => $this->getAndroidPriority(),
+            'ttl' => $this->getTimeToLive() ? $this->getTimeToLive() . "s" : null,
+            'restricted_package_name' => $this->getRestrictedPackageName(),
+        ];
+        return array_filter($android_options);
+    }
+
+    public function getAPNSOptions()
+    {
+        $ios_options = [
+            'payload' => [
+                'aps' => array_filter([
+                    "sound" => $this->getIosSound(),
+                    'content-available' => (int) $this->isContentAvailable(),
+                    'mutable-content' => (int) $this->isMutableContent(),
+                ]),
+            ],
+        ];
+
+        $fcm_options = array_filter([
+            'analytics_label' => $this->getIosAnalyticsLabel(),
+            'image' => $this->getIosImageUrl(),
+        ]);
+
+        $ios_headers = array_filter([
+                'apns-expiration' => $this->getTimeToLive() ? time() + $this->getTimeToLive() : 0,
+                'apns-priority' => $this->getPriority(),
+                'apns-collapse-id' => $this->getCollapseKey(),
+        ]);
+
+        if (!empty($headers)) {
+            $ios_options['headers'] = $ios_headers;
+        }
+        if (!empty($fcm_options)) {
+            $ios_options['fcm_options'] = $fcm_options;
+        }
+
+        return $ios_options;
+    }
+
+    /**
      * build an instance of Options.
      *
      * @return Options
@@ -301,12 +487,12 @@ final class OptionsPriorities
     /**
      * @const high priority : iOS, these correspond to APNs priorities 10.
      */
-    const high = 'high';
+    public const high = 'high';
 
     /**
      * @const normal priority : iOS, these correspond to APNs priorities 5
      */
-    const normal = 'normal';
+    public const normal = 'normal';
 
     /**
      * @return array priorities available in fcm
