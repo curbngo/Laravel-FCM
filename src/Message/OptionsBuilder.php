@@ -437,15 +437,19 @@ class OptionsBuilder
 
     public function getAPNSOptions()
     {
-        $ios_options = [
-            'payload' => [
-                'aps' => array_filter([
-                    "sound" => $this->getIosSound(),
-                    'content-available' => (int) $this->isContentAvailable(),
-                    'mutable-content' => (int) $this->isMutableContent(),
-                ]),
-            ],
-        ];
+        $ios_options = [];
+
+        $ios_aps = array_filter([
+            "sound" => $this->getIosSound(),
+            'content-available' => (int) $this->isContentAvailable(),
+            'mutable-content' => (int) $this->isMutableContent(),
+        ]);
+
+        if(!empty($ios_aps)) {
+            $ios_options['payload'] = [
+                'aps' => $ios_aps
+            ];
+        }
 
         $fcm_options = array_filter([
             'analytics_label' => $this->getIosAnalyticsLabel(),
