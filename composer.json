@@ -1,7 +1,6 @@
 {
     "name": "curbngo/laravel-fcm",
     "description": "Laravel / Lumen package for Firebase Cloud Messaging ",
-    "version": "2.0.0",
     "keywords": [
         "laravel",
         "lumen",
