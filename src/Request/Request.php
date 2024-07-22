@@ -147,7 +147,7 @@ class Request extends BaseRequest
 
         $result = [];
         foreach ($this->data->toArray() as $key => $value) {
-            $result[$key] = is_object($value) || is_array($value) ? json_encode($value) : $value;
+            $result[$key] = is_object($value) || is_array($value) ? json_encode($value) : "" . $value;
         }
 
         return $result;
