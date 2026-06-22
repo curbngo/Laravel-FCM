@@ -3,14 +3,14 @@
 namespace LaravelFCM;
 
 use Illuminate\Support\Str;
+use LaravelFCM\Request\FCMAuth;
 use LaravelFCM\Sender\FCMSender;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Contracts\Support\DeferrableProvider;
 
-class FCMServiceProvider extends ServiceProvider
+class FCMServiceProvider extends ServiceProvider implements DeferrableProvider
 {
-    protected $defer = true;
-
-    public function boot()
+    public function boot(): void
     {
         if (Str::contains($this->app->version(), 'Lumen')) {
             $this->app->configure('fcm');
@@ -21,26 +21,25 @@ class FCMServiceProvider extends ServiceProvider
         }
     }
 
-    public function register()
+    public function register(): void
     {
         if (!Str::contains($this->app->version(), 'Lumen')) {
             $this->mergeConfigFrom(__DIR__.'/../config/fcm.php', 'fcm');
         }
 
-        $this->app->singleton('fcm.client', function ($app) {
-            return (new FCMManager($app))->driver();
+        $this->app->singleton(FCMAuth::class, function () {
+            return new FCMAuth();
         });
 
         $this->app->bind('fcm.sender', function ($app) {
-            $client = $app[ 'fcm.client' ];
-            $url = $app[ 'config' ]->get('fcm.http.server_send_url');
+            $config = $app['config']->get('fcm.http');
 
-            return new FCMSender($client, $url);
+            return new FCMSender($config['server_send_url'], $config['timeout'] ?? 30.0);
         });
     }
 
     public function provides()
     {
-        return ['fcm.client', 'fcm.sender'];
+        return [FCMAuth::class, 'fcm.sender'];
     }
 }

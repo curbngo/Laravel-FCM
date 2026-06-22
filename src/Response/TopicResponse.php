@@ -5,7 +5,7 @@ namespace LaravelFCM\Response;
 use Monolog\Logger;
 use LaravelFCM\Message\Topics;
 use Monolog\Handler\StreamHandler;
-use Psr\Http\Message\ResponseInterface;
+use Illuminate\Http\Client\Response;
 
 /**
  * Class TopicResponse.
@@ -45,56 +45,28 @@ class TopicResponse extends BaseResponse implements TopicResponseContract
     /**
      * TopicResponse constructor.
      *
-     * @param \Psr\Http\Message\ResponseInterface $response
+     * @param \Illuminate\Http\Client\Response $response
      * @param Topics         $topic
      */
-    public function __construct(ResponseInterface $response, Topics $topic)
+    public function __construct(Response $response, Topics $topic)
     {
         $this->topic = $topic;
         parent::__construct($response);
     }
 
     /**
-     * parse the response.
+     * Parse a v1 success response. Errors are thrown upstream (BaseResponse).
      *
      * @param $responseInJson
      */
     protected function parseResponse($responseInJson)
     {
-        if (!$this->parseSuccess($responseInJson)) {
-            $this->parseError($responseInJson);
+        if (array_key_exists('name', $responseInJson)) {
+            $this->messageId = $responseInJson['name'];
         }
 
         if ($this->logEnabled) {
             $this->logResponse();
-        }
-    }
-
-    /**
-     * @internal
-     *
-     * @param $responseInJson
-     */
-    private function parseSuccess($responseInJson)
-    {
-        if (array_key_exists(self::MESSAGE_ID, $responseInJson)) {
-            $this->messageId = $responseInJson[ self::MESSAGE_ID ];
-        }
-    }
-
-    /**
-     * @internal
-     *
-     * @param $responseInJson
-     */
-    private function parseError($responseInJson)
-    {
-        if (array_key_exists(self::ERROR, $responseInJson)) {
-            if (in_array(self::LIMIT_RATE_TOPICS_EXCEEDED, $responseInJson)) {
-                $this->needRetry = true;
-            }
-
-            $this->error = $responseInJson[ self::ERROR ];
         }
     }
 

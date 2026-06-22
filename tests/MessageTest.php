@@ -6,35 +6,20 @@ use LaravelFCM\Message\OptionsPriorities;
 use LaravelFCM\Message\PayloadDataBuilder;
 use LaravelFCM\Message\PayloadNotificationBuilder;
 
-class PayloadTest extends FCMTestCase
+class MessageTest extends FCMTestCase
 {
     /**
      * @test
      */
     public function it_construct_a_valid_json_with_option()
     {
-        $targetPartial = '{
-					"collapse_key":"collapseKey",
-					"content_available":true
-				}';
-
-        $targetFull = '{
-					"collapse_key":"collapseKey",
-					"content_available":true,
-					"priority":"high",
-					"delay_while_idle":true,
-					"time_to_live":200,
-					"restricted_package_name":"customPackageName",
-					"dry_run": true
-				}';
-
         $optionBuilder = new OptionsBuilder();
-
         $optionBuilder->setCollapseKey('collapseKey');
         $optionBuilder->setContentAvailable(true);
 
-        $json = json_encode($optionBuilder->build()->toArray());
-        $this->assertJsonStringEqualsJsonString($targetPartial, $json);
+        $built = $optionBuilder->build()->toArray();
+        $this->assertEquals('collapseKey', $built['android']['collapse_key']);
+        $this->assertEquals(1, $built['apns']['payload']['aps']['content-available']);
 
         $optionBuilder->setPriority(OptionsPriorities::high)
             ->setDelayWhileIdle(true)
@@ -42,8 +27,11 @@ class PayloadTest extends FCMTestCase
             ->setRestrictedPackageName('customPackageName')
             ->setTimeToLive(200);
 
-        $json = json_encode($optionBuilder->build()->toArray());
-        $this->assertJsonStringEqualsJsonString($targetFull, $json);
+        $built = $optionBuilder->build()->toArray();
+        $this->assertEquals('collapseKey', $built['android']['collapse_key']);
+        $this->assertEquals('200s', $built['android']['ttl']);
+        $this->assertEquals('customPackageName', $built['android']['restricted_package_name']);
+        $this->assertEquals('10', $built['apns']['headers']['apns-priority']);
     }
 
     /**
@@ -134,7 +122,7 @@ class PayloadTest extends FCMTestCase
      */
     public function it_throws_an_invalidoptionsexception_if_the_interval_is_too_big()
     {
-        $this->setExpectedException(InvalidOptionsException::class);
+        $this->expectException(InvalidOptionsException::class);
 
         $optionBuilder = new OptionsBuilder();
         $optionBuilder->setTimeToLive(2419200 * 10);

@@ -457,12 +457,12 @@ class OptionsBuilder
         ]);
 
         $ios_headers = array_filter([
-                'apns-expiration' => $this->getTimeToLive() ? time() + $this->getTimeToLive() : 0,
-                'apns-priority' => $this->getPriority(),
-                'apns-collapse-id' => $this->getCollapseKey(),
+            'apns-expiration' => '' . ($this->getTimeToLive() ? time() + $this->getTimeToLive() : 0),
+            'apns-priority' => $this->getPriority() == OptionsPriorities::high ? '10' : '5',
+            'apns-collapse-id' => $this->getCollapseKey(),
         ]);
 
-        if (!empty($headers)) {
+        if (!empty($ios_headers)) {
             $ios_options['headers'] = $ios_headers;
         }
         if (!empty($fcm_options)) {

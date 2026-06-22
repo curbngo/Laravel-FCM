@@ -3,7 +3,7 @@
 namespace LaravelFCM\Response\Exceptions;
 
 use Exception;
-use Psr\Http\Message\ResponseInterface;
+use Illuminate\Http\Client\Response;
 
 /**
  * Class InvalidRequestException.
@@ -11,15 +11,10 @@ use Psr\Http\Message\ResponseInterface;
 class InvalidRequestException extends Exception
 {
     /**
-     * InvalidRequestException constructor.
-     *
-     * @param \Psr\Http\Message\ResponseInterface $response
+     * @param \Illuminate\Http\Client\Response $response
      */
-    public function __construct(ResponseInterface $response)
+    public function __construct(Response $response)
     {
-        $code = $response->getStatusCode();
-        $responseBody = $response->getBody()->getContents();
-
-        parent::__construct($responseBody, $code);
+        parent::__construct($response->body(), $response->status());
     }
 }

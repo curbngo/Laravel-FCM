@@ -3,7 +3,7 @@
 namespace LaravelFCM\Response\Exceptions;
 
 use Exception;
-use Psr\Http\Message\ResponseInterface;
+use Illuminate\Http\Client\Response;
 
 /**
  * Class ServerResponseException.
@@ -13,25 +13,17 @@ class ServerResponseException extends Exception
     /**
      * retry after.
      *
-     * @var int
+     * @var string|null
      */
     public $retryAfter;
 
     /**
-     * ServerResponseException constructor.
-     *
-     * @param \Psr\Http\Message\ResponseInterface $response
+     * @param \Illuminate\Http\Client\Response $response
      */
-    public function __construct(ResponseInterface $response)
+    public function __construct(Response $response)
     {
-        $code = $response->getStatusCode();
-        $responseHeader = $response->getHeaders();
-        $responseBody = $response->getBody()->getContents();
+        $this->retryAfter = $response->header('Retry-After') ?: null;
 
-        if (array_keys($responseHeader, 'Retry-After')) {
-            $this->retryAfter = $responseHeader['Retry-After'];
-        }
-
-        parent::__construct($responseBody, $code);
+        parent::__construct($response->body(), $response->status());
     }
 }

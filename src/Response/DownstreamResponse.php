@@ -4,25 +4,17 @@ namespace LaravelFCM\Response;
 
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
-use Psr\Http\Message\ResponseInterface;
+use Illuminate\Http\Client\Response;
 
 /**
  * Class DownstreamResponse.
  */
 class DownstreamResponse extends BaseResponse implements DownstreamResponseContract
 {
-    const MULTICAST_ID = 'multicast_id';
-    const CANONICAL_IDS = 'canonical_ids';
-    const RESULTS = 'results';
-
-    const MISSING_REGISTRATION = 'MissingRegistration';
-    const MESSAGE_ID = 'message_id';
-    const REGISTRATION_ID = 'registration_id';
-    const NOT_REGISTERED = 'NotRegistered';
-    const INVALID_REGISTRATION = 'InvalidRegistration';
-    const UNAVAILABLE = 'Unavailable';
-    const DEVICE_MESSAGE_RATE_EXCEEDED = 'DeviceMessageRateExceeded';
-    const INTERNAL_SERVER_ERROR = 'InternalServerError';
+    public const NAME = 'name';
+    public const UNREGISTERED = 'UNREGISTERED';
+    public const INVALID_ARGUMENT = 'INVALID_ARGUMENT';
+    public const SENDER_ID_MISMATCH = 'SENDER_ID_MISMATCH';
 
     /**
      * @internal
@@ -96,10 +88,10 @@ class DownstreamResponse extends BaseResponse implements DownstreamResponseContr
     /**
      * DownstreamResponse constructor.
      *
-     * @param \Psr\Http\Message\ResponseInterface $response
+     * @param \Illuminate\Http\Client\Response $response
      * @param                $tokens
      */
-    public function __construct(ResponseInterface $response, $tokens)
+    public function __construct(Response $response, $tokens)
     {
         $this->tokens = is_string($tokens) ? [$tokens] : $tokens;
 
@@ -107,181 +99,65 @@ class DownstreamResponse extends BaseResponse implements DownstreamResponseContr
     }
 
     /**
-     * Parse the response.
+     * Build an empty accumulator response (used when sending to many tokens).
      *
-     * @param $responseInJson
+     * @return self
+     */
+    public static function makeEmpty()
+    {
+        $instance = (new \ReflectionClass(self::class))->newInstanceWithoutConstructor();
+        $instance->tokens = [];
+
+        return $instance;
+    }
+
+    /**
+     * Record a token whose v1 send failed, classifying it from the exception.
+     *
+     * @param string     $token
+     * @param \Exception $e
+     */
+    public function addFailedToken($token, \Exception $e)
+    {
+        $this->numberTokensFailure++;
+
+        $status = null;
+        $decoded = json_decode($e->getMessage(), true);
+        if (is_array($decoded) && isset($decoded['error']['status'])) {
+            $status = $decoded['error']['status'];
+        }
+        $code = $e->getCode();
+
+        if (in_array($status, ['UNREGISTERED', 'INVALID_ARGUMENT', 'SENDER_ID_MISMATCH']) || in_array($code, [400, 403, 404])) {
+            $this->tokensToDelete[] = $token;
+
+            return;
+        }
+
+        if (in_array($status, ['UNAVAILABLE', 'INTERNAL', 'QUOTA_EXCEEDED']) || in_array($code, [429, 500, 503])) {
+            $this->tokensToRetry[] = $token;
+
+            return;
+        }
+
+        $this->tokensWithError[$token] = $status ?? (string) $code;
+    }
+
+    /**
+     * Parse a v1 success response. Errors are thrown upstream (BaseResponse).
+     *
+     * @param array $responseInJson
      */
     protected function parseResponse($responseInJson)
     {
-        $this->parse($responseInJson);
+        $this->numberTokensSuccess = count($this->tokens);
 
-        if ($this->needResultParsing($responseInJson)) {
-            $this->parseResult($responseInJson);
+        if (array_key_exists(self::NAME, $responseInJson)) {
+            $this->messageId = $responseInJson[self::NAME];
         }
 
         if ($this->logEnabled) {
             $this->logResponse();
-        }
-    }
-
-    /**
-     * @internal
-     *
-     * @param $responseInJson
-     */
-    private function parse($responseInJson)
-    {
-        if (array_key_exists(self::MULTICAST_ID, $responseInJson)) {
-            $this->messageId;
-        }
-
-        if (array_key_exists(self::SUCCESS, $responseInJson)) {
-            $this->numberTokensSuccess = $responseInJson[self::SUCCESS];
-        }
-
-        if (array_key_exists(self::FAILURE, $responseInJson)) {
-            $this->numberTokensFailure = $responseInJson[self::FAILURE];
-        }
-
-        if (array_key_exists(self::CANONICAL_IDS, $responseInJson)) {
-            $this->numberTokenModify = $responseInJson[self::CANONICAL_IDS];
-        }
-    }
-
-    /**
-     * @internal
-     *
-     * @param $responseInJson
-     */
-    private function parseResult($responseInJson)
-    {
-        foreach ($responseInJson[self::RESULTS] as $index => $result) {
-            if (!$this->isSent($result)) {
-                if (!$this->needToBeModify($index, $result)) {
-                    if (!$this->needToBeDeleted($index, $result) && !$this->needToResend($index, $result) && !$this->checkMissingToken($result)) {
-                        $this->needToAddError($index, $result);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * @internal
-     *
-     * @param $responseInJson
-     *
-     * @return bool
-     */
-    private function needResultParsing($responseInJson)
-    {
-        return array_key_exists(self::RESULTS, $responseInJson) && ($this->numberTokensFailure > 0 || $this->numberTokenModify > 0);
-    }
-
-    /**
-     * @internal
-     *
-     * @param $results
-     *
-     * @return bool
-     */
-    private function isSent($results)
-    {
-        return array_key_exists(self::MESSAGE_ID, $results) && !array_key_exists(self::REGISTRATION_ID, $results);
-    }
-
-    /**
-     * @internal
-     *
-     * @param $index
-     * @param $result
-     *
-     * @return bool
-     */
-    private function needToBeModify($index, $result)
-    {
-        if (array_key_exists(self::MESSAGE_ID, $result) && array_key_exists(self::REGISTRATION_ID, $result)) {
-            if ($this->tokens[$index]) {
-                $this->tokensToModify[$this->tokens[$index]] = $result[self::REGISTRATION_ID];
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @internal
-     *
-     * @param $index
-     * @param $result
-     *
-     * @return bool
-     */
-    private function needToBeDeleted($index, $result)
-    {
-        if (array_key_exists(self::ERROR, $result) &&
-            (in_array(self::NOT_REGISTERED, $result) || in_array(self::INVALID_REGISTRATION, $result))) {
-            if ($this->tokens[$index]) {
-                $this->tokensToDelete[] = $this->tokens[$index];
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @internal
-     *
-     * @param $index
-     * @param $result
-     *
-     * @return bool
-     */
-    private function needToResend($index, $result)
-    {
-        if (array_key_exists(self::ERROR, $result) && (in_array(self::UNAVAILABLE, $result) || in_array(self::DEVICE_MESSAGE_RATE_EXCEEDED, $result) || in_array(self::INTERNAL_SERVER_ERROR, $result))) {
-            if ($this->tokens[$index]) {
-                $this->tokensToRetry[] = $this->tokens[$index];
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @internal
-     *
-     * @param $result
-     *
-     * @return bool
-     */
-    private function checkMissingToken($result)
-    {
-        $hasMissingToken = (array_key_exists(self::ERROR, $result) && in_array(self::MISSING_REGISTRATION, $result));
-
-        $this->hasMissingToken = (bool) ($this->hasMissingToken | $hasMissingToken);
-
-        return $hasMissingToken;
-    }
-
-    /**
-     * @internal
-     *
-     * @param $index
-     * @param $result
-     */
-    private function needToAddError($index, $result)
-    {
-        if (array_key_exists(self::ERROR, $result)) {
-            if ($this->tokens[$index]) {
-                $this->tokensWithError[$this->tokens[$index]] = $result[self::ERROR];
-            }
         }
     }
 

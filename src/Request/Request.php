@@ -76,7 +76,6 @@ class Request extends BaseRequest
     {
         $message = [
             'token' => $this->getTo(),
-            'registration_ids' => $this->getRegistrationIds(),
             'notification' => $this->getNotification(),
             'data' => $this->getData(),
         ];
@@ -93,23 +92,11 @@ class Request extends BaseRequest
      */
     protected function getTo()
     {
-        $to = is_array($this->to) ? reset($this->to) : $this->to;
-
-        return $to;
+        return is_array($this->to) ? reset($this->to) : $this->to;
     }
 
     /**
-     * get registrationIds transformed.
-     *
-     * @return array|null
-     */
-    protected function getRegistrationIds()
-    {
-        return is_array($this->to) ? $this->to : null;
-    }
-
-    /**
-     * get Options transformed.
+     * get Options transformed, including topic/condition.
      *
      * @return array
      */
@@ -117,8 +104,12 @@ class Request extends BaseRequest
     {
         $options = $this->options ? $this->options->toArray() : [];
 
-        if ($this->topic && !$this->topic->hasOnlyOneTopic()) {
-            $options = array_merge($options, $this->topic->build());
+        if ($this->topic) {
+            if ($this->topic->hasOnlyOneTopic()) {
+                $options['topic'] = $this->topic->build();
+            } else {
+                $options = array_merge($options, $this->topic->build());
+            }
         }
 
         return $options;

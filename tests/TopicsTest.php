@@ -1,9 +1,7 @@
 <?php
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Response;
+use Illuminate\Support\Facades\Http;
 use LaravelFCM\Message\Topics;
-use LaravelFCM\Sender\FCMSender;
 use LaravelFCM\Message\Exceptions\NoTopicProvidedException;
 
 class TopicsTest extends FCMTestCase
@@ -15,22 +13,44 @@ class TopicsTest extends FCMTestCase
     {
         $topics = new Topics();
 
-        $this->setExpectedException(NoTopicProvidedException::class);
+        $this->expectException(NoTopicProvidedException::class);
         $topics->build();
     }
 
     /**
      * @test
      */
-    public function it_has_only_one_topic()
+    public function it_builds_a_single_topic_body()
     {
-        $target = '/topics/myTopic';
+        Http::fake(['*' => Http::response(['name' => 'projects/test/messages/1'], 200)]);
 
-        $topics = new Topics();
-
+        $topics = new \LaravelFCM\Message\Topics();
         $topics->topic('myTopic');
 
-        $this->assertEquals($target, $topics->build());
+        \LaravelFCM\Facades\FCM::sendToTopic($topics);
+
+        Http::assertSent(function ($request) {
+            return $request['message']['topic'] === 'myTopic'
+                && !array_key_exists('condition', $request['message']);
+        });
+    }
+
+    /**
+     * @test
+     */
+    public function it_builds_a_condition_body()
+    {
+        Http::fake(['*' => Http::response(['name' => 'projects/test/messages/1'], 200)]);
+
+        $topics = new \LaravelFCM\Message\Topics();
+        $topics->topic('TopicA')->andTopic('TopicB');
+
+        \LaravelFCM\Facades\FCM::sendToTopic($topics);
+
+        Http::assertSent(function ($request) {
+            return $request['message']['condition'] === "'TopicA' in topics && 'TopicB' in topics"
+                && !array_key_exists('topic', $request['message']);
+        });
     }
 
     /**
@@ -106,44 +126,15 @@ class TopicsTest extends FCMTestCase
     /**
      * @test
      */
-    public function it_send_a_notification_to_a_topic()
+    public function it_reports_topic_send_success_from_name()
     {
-        $response = new Response(200, [], '{"message_id":6177433633397011933}');
+        Http::fake(['*' => Http::response(['name' => 'projects/test/messages/9'], 200)]);
 
-        $client = Mockery::mock(Client::class);
-        $client->shouldReceive('request')->once()->andReturn($response);
+        $topics = new \LaravelFCM\Message\Topics();
+        $topics->topic('myTopic');
 
-        $fcm = new FCMSender($client, 'http://test.test');
-
-        $topics = new Topics();
-        $topics->topic('test');
-
-        $response = $fcm->sendToTopic($topics);
+        $response = \LaravelFCM\Facades\FCM::sendToTopic($topics);
 
         $this->assertTrue($response->isSuccess());
-        $this->assertFalse($response->shouldRetry());
-        $this->assertNull($response->error());
-    }
-
-    /**
-     * @test
-     */
-    public function it_send_a_notification_to_a_topic_and_return_error()
-    {
-        $response = new Response(200, [], '{"error":"TopicsMessageRateExceeded"}');
-
-        $client = Mockery::mock(Client::class);
-        $client->shouldReceive('request')->once()->andReturn($response);
-
-        $fcm = new FCMSender($client, 'http://test.test');
-
-        $topics = new Topics();
-        $topics->topic('test');
-
-        $response = $fcm->sendToTopic($topics);
-
-        $this->assertFalse($response->isSuccess());
-        $this->assertTrue($response->shouldRetry());
-        $this->assertEquals('TopicsMessageRateExceeded', $response->error());
     }
 }

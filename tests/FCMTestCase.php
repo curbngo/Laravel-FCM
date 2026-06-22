@@ -1,22 +1,31 @@
 <?php
 
-use Illuminate\Foundation\Testing\TestCase;
+use LaravelFCM\Request\FCMAuth;
+use Orchestra\Testbench\TestCase;
 
 abstract class FCMTestCase extends TestCase
 {
-    public function createApplication()
+    protected function getPackageProviders($app)
     {
-        $app = require __DIR__.'/../vendor/laravel/laravel/bootstrap/app.php';
+        return [
+            \LaravelFCM\FCMServiceProvider::class,
+        ];
+    }
 
-        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-        $app->register(LaravelFCM\FCMServiceProvider::class);
+    protected function getEnvironmentSetUp($app)
+    {
+        $app['config']->set('fcm.driver', 'http');
+        $app['config']->set('fcm.http.timeout', 20);
+        $app['config']->set('fcm.http.server_send_url', 'http://test.test');
+        $app['config']->set('fcm.http.sender_id', 'SENDER_ID');
+    }
 
-        $app['config']['fcm.driver'] = 'http';
-        $app['config']['fcm.http.timeout'] = 20;
-        $app['config']['fcm.http.server_send_url'] = 'http://test.test';
-        $app['config']['fcm.http.server_key'] = 'key=myKey';
-        $app['config']['fcm.http.sender_id'] = 'SENDER_ID';
+    protected function setUp(): void
+    {
+        parent::setUp();
 
-        return $app;
+        $auth = Mockery::mock(FCMAuth::class);
+        $auth->shouldReceive('getAccessToken')->andReturn('fake-access-token');
+        $this->app->instance(FCMAuth::class, $auth);
     }
 }

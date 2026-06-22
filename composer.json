@@ -11,6 +11,7 @@
         "firebase cloud messaging"
     ],
     "type": "library",
+    "version": "3.0.0",
     "license": "MIT",
     "authors": [
         {
@@ -19,14 +20,15 @@
         }
     ],
     "require": {
-        "php": "^7.3|^8.0",
-        "illuminate/support": "^8.0 || ^9.0 || ^10.0",
-        "guzzlehttp/guzzle": "~7.0",
-        "monolog/monolog": "^1.12|^2.0|^3.0",
+        "php": "^8.2",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/http": "^11.0 || ^12.0 || ^13.0",
+        "monolog/monolog": "^3.0",
         "google/auth": "^1.37"
     },
     "require-dev": {
-        "laravel/laravel": "^8.0 || ^9.0 || ^10.0"
+        "orchestra/testbench": "^9.0 || ^10.0 || ^11.0",
+        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0"
     },
     "autoload": {
         "psr-4": {

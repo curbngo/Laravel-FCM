@@ -1,92 +1,60 @@
 <?php
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Response;
-use LaravelFCM\Sender\FCMSender;
+use Illuminate\Support\Facades\Http;
+use LaravelFCM\Facades\FCM;
 
-class ResponseTest extends FCMTestCase
+class DownstreamTest extends FCMTestCase
 {
     /**
      * @test
      */
-    public function it_send_a_notification_to_a_device()
+    public function it_sends_a_notification_to_a_single_token()
     {
-        $response = new Response(200, [], '{ 
-						  "multicast_id": 216,
-						  "success": 3,
-						  "failure": 3,
-						  "canonical_ids": 1,
-						  "results": [
-							    { "message_id": "1:0408" }
-	                      ]
-					}');
+        Http::fake([
+            '*' => Http::response(['name' => 'projects/test/messages/123'], 200),
+        ]);
 
-        $client = Mockery::mock(Client::class);
-        $client->shouldReceive('request')->once()->andReturn($response);
+        $response = FCM::sendTo('uniqueToken');
 
-        $tokens = 'uniqueToken';
+        $this->assertEquals(1, $response->numberSuccess());
+        $this->assertEquals(0, $response->numberFailure());
 
-        $fcm = new FCMSender($client, 'http://test.test');
-        $fcm->sendTo($tokens);
+        Http::assertSent(function ($request) {
+            return $request['message']['token'] === 'uniqueToken'
+                && !array_key_exists('registration_ids', $request['message']);
+        });
     }
 
     /**
      * @test
      */
-    public function it_send_a_notification_to_more_than_1000_devices()
+    public function it_throws_404_for_an_unregistered_token()
     {
-        $response = new Response(200, [], '{ 
-						  "multicast_id": 216,
-						  "success": 3,
-						  "failure": 3,
-						  "canonical_ids": 1,
-						  "results": [
-							    { "message_id": "1:0408" },
-							    { "error": "Unavailable" },
-							    { "error": "InvalidRegistration" },
-							    { "message_id": "1:1516" },
-							    { "message_id": "1:2342", "registration_id": "32" },
-							    { "error": "NotRegistered"}
-	                      ]
-					}');
+        Http::fake([
+            '*' => Http::response(['error' => ['code' => 404, 'status' => 'UNREGISTERED']], 404),
+        ]);
 
-        $client = Mockery::mock(Client::class);
-        $client->shouldReceive('request')->times(10)->andReturn($response);
-
-        $tokens = [];
-        for ($i = 0; $i < 10000; ++$i) {
-            $tokens[$i] = 'token_'.$i;
+        try {
+            FCM::sendTo('deadToken');
+            $this->fail('expected an exception');
+        } catch (\Exception $e) {
+            $this->assertEquals(404, $e->getCode());
         }
-
-        $fcm = new FCMSender($client, 'http://test.test');
-        $fcm->sendTo($tokens);
     }
 
     /**
      * @test
      */
-    public function an_empty_array_of_tokens_thrown_an_exception()
+    public function it_collects_failed_tokens_for_array_sends()
     {
-        $response = new Response(400, [], '{ 
-						  "multicast_id": 216,
-						  "success": 3,
-						  "failure": 3,
-						  "canonical_ids": 1,
-						  "results": [
-							    { "message_id": "1:0408" },
-							    { "error": "Unavailable" },
-							    { "error": "InvalidRegistration" },
-							    { "message_id": "1:1516" },
-							    { "message_id": "1:2342", "registration_id": "32" },
-							    { "error": "NotRegistered"}
-	                      ]
-					}');
+        Http::fakeSequence()
+            ->push(['name' => 'projects/test/messages/1'], 200)
+            ->push(['error' => ['code' => 404, 'status' => 'UNREGISTERED']], 404);
 
-        $client = Mockery::mock(Client::class);
-        $client->shouldReceive('request')->once()->andReturn($response);
+        $response = FCM::sendTo(['goodToken', 'deadToken']);
 
-        $fcm = new FCMSender($client, 'http://test.test');
-        $this->setExpectedException(\LaravelFCM\Response\Exceptions\InvalidRequestException::class);
-        $fcm->sendTo([]);
+        $this->assertEquals(1, $response->numberSuccess());
+        $this->assertEquals(1, $response->numberFailure());
+        $this->assertEquals(['deadToken'], $response->tokensToDelete());
     }
 }

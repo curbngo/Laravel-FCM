@@ -2,7 +2,7 @@
 
 namespace LaravelFCM\Response;
 
-use Psr\Http\Message\ResponseInterface;
+use Illuminate\Http\Client\Response;
 use LaravelFCM\Response\Exceptions\ServerResponseException;
 use LaravelFCM\Response\Exceptions\InvalidRequestException;
 use LaravelFCM\Response\Exceptions\UnauthorizedRequestException;
@@ -25,36 +25,36 @@ abstract class BaseResponse
     /**
      * BaseResponse constructor.
      *
-     * @param \Psr\Http\Message\ResponseInterface $response
+     * @param \Illuminate\Http\Client\Response $response
      */
-    public function __construct(ResponseInterface $response)
+    public function __construct(Response $response)
     {
         $this->isJsonResponse($response);
         $this->logEnabled = app('config')->get('fcm.log_enabled', false);
-        $responseInJson = json_decode($response->getBody(), true);
+        $responseInJson = $response->json() ?? [];
         $this->parseResponse($responseInJson);
     }
 
     /**
-     * Check if the response given by fcm is parsable.
-     *
-     * @param \Psr\Http\Message\ResponseInterface $response
+     * @param \Illuminate\Http\Client\Response $response
      *
      * @throws InvalidRequestException
      * @throws ServerResponseException
      * @throws UnauthorizedRequestException
      */
-    private function isJsonResponse(ResponseInterface $response)
+    private function isJsonResponse(Response $response)
     {
-        if ($response->getStatusCode() == 200) {
+        $status = $response->status();
+
+        if ($status == 200) {
             return;
         }
 
-        if ($response->getStatusCode() == 400) {
+        if ($status == 400) {
             throw new InvalidRequestException($response);
         }
 
-        if ($response->getStatusCode() == 401) {
+        if ($status == 401) {
             throw new UnauthorizedRequestException($response);
         }
 

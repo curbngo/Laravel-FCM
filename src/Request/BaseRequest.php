@@ -12,13 +12,6 @@ abstract class BaseRequest
     /**
      * @internal
      *
-     * @var \GuzzleHttp\ClientInterface
-     */
-    protected $client;
-
-    /**
-     * @internal
-     *
      * @var array
      */
     protected $config;
@@ -30,7 +23,7 @@ abstract class BaseRequest
     public function __construct()
     {
         $this->config = app('config')->get('fcm.http', []);
-        $this->fcm_auth = new FCMAuth();
+        $this->fcm_auth = app(FCMAuth::class);
     }
 
     /**
@@ -42,8 +35,6 @@ abstract class BaseRequest
     {
         return [
             'Authorization' => 'Bearer ' . $this->fcm_auth->getAccessToken(),
-            'Content-Type' => 'application/json',
-            'project_id' => $this->config['sender_id'],
         ];
     }
 
